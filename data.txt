@@ -1,0 +1,1340 @@
+import React, { Component, PureComponent } from "react";
+import { View, TextInput, Text, TouchableOpacity, FlatList, KeyboardAvoidingView, Image, Alert, StyleSheet, Modal, Platform } from "react-native";
+import { BarNavigationLogOut } from '../../components/BarNavigationLogOut'
+import { LineTextbox } from "../../components/LineTextbox";
+import Colors from "../../themes/Colors";
+import { CardBody } from '../../components/CardBody';
+import { Loading } from "../../components/Loading";
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scrollview';
+import LocalImages from "../../themes/Images";
+import moment from "moment";
+import { BotonAzulClaro } from "../../components/BotonAzulClaro";
+import { PickerAzulClaro } from "../../components/PickerAzulClaro"
+import { LinearGradientBottom } from "../../components/LinearGradientBottom";
+import Helpers from "../../Utils/Helpers";
+import { AppApi } from "../../services";
+import ModalAlert from "../../components/ModalAlert";
+import CodeInput from 'react-native-code-input';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PickerAzul } from "../../components/PickerAzul";
+import { PickerAzulRegistro } from "../../components/PickerAzulRegistro";
+import UserLogged from "../../stores/UserLogged";
+import CheckBox from '@react-native-community/checkbox';
+
+
+const preguntas1 = [
+
+  // {
+  //   id: 1,
+  //   pregunta: "¡Hola! Bienvenido a Club Vini. Por favor ingresa tu número SAP. Consulta este dato con Vitromart (Mostrador o Ventas).",
+  //   nombreCampo: "codigo"
+  // },
+
+  // {
+  //   id: 2,
+  //   pregunta: "Por favor ingresa tu número de teléfono celular.",
+  //   tipoPregunta: "BuscadorCliente",
+  //   nombreCampo: "telefonoCelular"
+  // },
+  // {
+  //   id: 3,
+  //   pregunta: "",
+  //   tituloPregunta: "Confirma si los datos son correctos:",
+  //   nombreCampo: "nombre",
+  //   tipoPregunta: "Validacion"
+  // },
+
+  {
+    id: 4,
+    pregunta: "Por favor ingresa tu número de celular.",
+    nombreCampo: "telefonoCelular"
+  },
+  {
+    id: 5,
+    pregunta: "Por favor ingresa tu número de nombre(s).",
+    nombreCampo: "nombre"
+  },
+  {
+    id: 6,
+    pregunta: "Por favor ingresa tu apellido paterno.",
+    nombreCampo: "aPaterno"
+  },
+  {
+    id: 7,
+    pregunta: "Por favor ingresa tu apellido materno.",
+    nombreCampo: "aMaterno"
+  },
+  {
+    id: 8,
+    pregunta: "¿Cuál es tu fecha de nacimiento?",
+    tipoPregunta: "OpcionFecha",
+    nombreCampo: "fechaNacimiento"
+  },
+  {
+    id: 9,
+    pregunta: "¿Cuál es tu giro?",
+    tipoPregunta: "OpcionMultiple",
+    nombreCampo: "giroId"
+  },
+  {
+    id: 10,
+    pregunta: "¿Cuál es tu estado de residencia?",
+    tipoPregunta: "PickerEstados",
+    nombreCampo: "estado"
+  },
+  {
+    id: 11,
+    pregunta: null,
+    tipoPregunta: "CierreCuestionario",
+  },
+
+
+];
+
+export class RegistroScreen extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      loading: false,
+      cuestionarioRgistro: [],
+      contadorPregunta: 1,
+      loading: true,
+      respuesta: "",
+      flatListRef: [],
+      numeroCelular: "",
+      telefono: "",
+      pass: "",
+      confirmPass: "",
+      passToken: "",
+      maxfechaNac: moment().add(-18, "years").toDate(),
+      minfechaNac: moment().add(-100, "years").toDate(),
+      respuestas: [],
+      visibleModal: false,
+      modalCodigoVerificacion: false,
+      isDatePickerVisible: false,
+      modalNuevoPass: false,
+      confirmaInicioSesion: false,
+      aceptaAvisoyTerminos: false,
+      estadoId: -1,
+      PickerValueHolder: 0,
+      estados: [],
+      giros: [],
+      inactivaBoton: false,
+      disablePicker: false,
+      preguntas: [],
+      maxfechaNac: moment().add(-18, "years").toDate(),
+      minfechaNac: moment().add(-100, "years").toDate(),
+      visibleModalGiro: false,
+      giroNegocio: ""
+
+    }
+
+  }
+
+  TextosRegistro = () => {
+    Helpers.setApi(AppApi.TextosRegistro).then((response) => {
+      const Data = response.data;
+      this.setState({
+        preguntas: Data//Data,
+      }, () => {
+        this.Estados();
+      })
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+  }
+
+  BuscarCliente = (value) => {
+    const { cuestionarioRgistro, contadorPregunta, giro, fechaNacimeinto, respuestas, preguntas } = this.state;
+
+    let objetoRespuesta = `{"${preguntas[contadorPregunta - 1].nombreCampo}": "${value}"}`;
+    const obj = JSON.parse(objetoRespuesta);
+    const resp = { ...respuestas, ...obj };
+
+    this.setState({ cuestionarioRgistro, loading: false, cuestionario: contadorPregunta, contadorPregunta: contadorPregunta + 1, respuesta: "", respuestas: resp })
+
+    console.log("resp ==>", resp);
+    const jsonRequest = {
+      "codigo": resp.codigo,
+      "celular": resp.telefonoCelular,
+    };
+
+    Helpers.setApi(AppApi.BuscarCliente, jsonRequest).then((response) => {
+
+      this._flat.scrollToOffset({ animated: true, offset: 2000 })
+
+      // const resp = respuestas;
+
+      cuestionarioRgistro.push({
+        id: preguntas[contadorPregunta].id,
+        tituloPregunta: preguntas[contadorPregunta].tituloPregunta,
+        tipoPregunta: preguntas[contadorPregunta].tipoPregunta,
+        pregunta: response.data,
+        respuesta: value
+      });
+
+      let objetoRespuesta = `{"${preguntas[contadorPregunta - 1].nombreCampo}": "${value}"}`;
+      const obj = JSON.parse(objetoRespuesta);
+      const resp = { ...respuestas, ...obj };
+
+      this.setState({ cuestionarioRgistro, loading: false, contadorPregunta: contadorPregunta + 1, respuesta: "", respuestas: resp })
+
+
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.refreshCuestionaro();
+      this.setState({ loading: false })
+    })
+  }
+
+  registrarUsuario = () => {
+    const { respuestas, aceptaAvisoyTerminos, estadoId } = this.state;
+
+    // if (aceptaAvisoyTerminos == false) {
+
+
+    //   Alert.alert('¡Recuerda!', 'Debes aceptar el aviso de privacidad y los términos y condiciones para continuar con tu registro.', [
+    //     {
+    //       text: 'Aceptar'
+    //     }
+    //   ], {
+    //     cancelable: false
+    //   });
+
+    //   return;
+    // }
+
+    // const jsonRequest = {
+    //   "codigo": respuestas[0].respuestas,
+    //   "telefonoCelular": respuestas[1].respuestas,
+    //   "giroId": respuestas[5].respuestas, //respuestas[2].respuestas,
+    //   "estado": respuestas[6].respuestas,
+    //   "fechaNacimiento": moment(respuestas[4].respuestas).format("YYYY-MM-DD"),
+    // };
+
+
+    console.log("respuestas ==>", respuestas);
+    Helpers.setApi(AppApi.RegistrarCuenta, respuestas).then((response) => {
+
+      this.setState({
+        visibleModal: true,
+        telefono: respuestas.telefonoCelular
+
+      })
+
+    }).catch(error => {
+      console.log("error ==>", JSON.stringify(error));
+      this.setState({ loading: false })
+    })
+  }
+
+  GiroOtro = () => {
+
+    Helpers.setApi(AppApi.Giro).then((response) => {
+      const Data = response.data;
+      const giros = [];
+      Data.map((item) => {
+        giros.push({ label: item.text, value: item.value });
+      });
+
+      if (this.state.giroNegocio) {
+        giros.push({ label: this.state.giroNegocio, value: this.state.giroNegocio + this.state.giroNegocio + '-' + 6 })
+      }
+
+      this.setState(() => this.state.cuestionarioRgistro === [] ? this.cargaCuestionarioInicial() : null,);
+    }).catch(error => {
+      console.log('Error Otro Giro =====> ', error);
+      this.setState({ loading: false });
+    })
+  }
+
+  Giro = () => {
+
+
+    Helpers.setApi(AppApi.Giro).then((response) => {
+      const Data = response.data;
+      const giros = [];
+      Data.map((item) => {
+        giros.push({ label: item.text, value: item.value });
+      });
+
+      this.setState({
+        giros
+      }, () => this.cargaCuestionarioInicial());
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+  }
+
+  ReenviarCodigo = () => {
+    const { telefono } = this.state;
+
+    Helpers.setApi(AppApi.RecuperarPass, telefono).then((response) => {
+
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+
+  }
+
+
+  validaCodigoVerificacion = () => {
+    const { respuestas, codigo, telefono } = this.state;
+    // console.log("respuestas ==>", respuestas);
+    // console.log("codigo ==>", codigo);
+
+
+    if (codigo == undefined) {
+      Alert.alert('¡Recuerda!', '¡Debes ingresar el código completo', [
+        {
+          text: 'Aceptar',
+
+        }
+      ], {
+        cancelable: false
+      });
+
+      return;
+
+    }
+
+    const jsonRequest = {
+      "codigo": codigo,
+      "celular": telefono
+
+    }
+
+    Helpers.setApi(AppApi.ValidaCodigoRegistro, jsonRequest).then((response) => {
+      const Data = response.data;
+
+
+      console.log("response Token ==>", response)
+      this.setState({
+        passToken: `${Data.token}`,
+        modalCodigoVerificacion: false,
+        modalNuevoPass: true
+
+      })
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+
+  }
+
+  validCaracteres = (pass) => {
+    let cantidades = {
+      números_o_símbolos: 1,
+      mayúsculas: 1,
+      minúsculas: 1,
+      letras: 1,
+      longitud_contraseña: 1
+    }
+    const número = "\\d"
+    const símbolos = "$@"
+    const número_o_símbolo = "(" + número + "|[" + símbolos + "])"
+    const números_o_símbolos = "(?:.*" + número_o_símbolo + "){" + cantidades.números_o_símbolos + "}"
+    const mayúsculas = "(?:.*[A-Z]){" + cantidades.mayúsculas + "}"
+    const minúsculas = "(?:.*[a-z]){" + cantidades.minúsculas + "}"
+    const cadena = "^" +
+      "(?=" + números_o_símbolos + ")" +
+      "(?=" + mayúsculas + ")" +
+      "(?=" + minúsculas + ")" +
+      "\\S{" + cantidades.longitud_contraseña + ",}" +
+      "$";
+    const expresión_regular = new RegExp(cadena, "g")
+
+    const encontrados = pass.match(expresión_regular)
+    const encuentra = encontrados != null;
+
+    if (!encuentra) {
+      return false;
+    }
+
+    return true;
+
+
+  }
+
+  validaPassword = () => {
+    const { pass, confirmPass, passToken, telefono } = this.state;
+    const validaCaracteres = this.validCaracteres(pass);
+
+    if (pass == '') {
+
+      Alert.alert('Contraseña', 'El campo de Contraseña esta vacío.', [
+        {
+          text: 'Aceptar'
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+    }
+    if (confirmPass == '') {
+
+      Alert.alert('Confirmar contraseña', 'El campo de Confirmar contraseña esta vacío.', [
+        {
+          text: 'Aceptar'
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+    }
+    if (pass != confirmPass) {
+
+      Alert.alert('Contraseñas', 'Las contraseñas no coinciden.', [
+        {
+          text: 'Aceptar'
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+    }
+    if (confirmPass.length < 8) {
+
+      Alert.alert('', 'Las contraseñas deben tener 8 caracteres como mínimo', [
+        {
+          text: 'Aceptar',
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+
+    }
+
+    if (!validaCaracteres) {
+      Alert.alert('', 'La contraseña debe contener al menos un carácter de cada elemento: mayúsculas, minúsculas, números y símbolos ( .#@!#$%&/)_(=+- )', [
+        {
+          text: 'Aceptar',
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+
+    }
+
+    const jsonRequest = {
+      token: passToken,
+      username: telefono,
+      contrasenia: pass
+
+    };
+
+
+    Helpers.setApi(AppApi.GeneraContrasenia, jsonRequest).then((response) => {
+
+      this.setState({
+        modalNuevoPass: false,
+        confirmaInicioSesion: true
+
+      })
+
+    }).catch(error => {
+      console.log("error ==>", JSON.stringify(error));
+      Alert.alert('¡Ups!', 'Por favor comunícate con nosotros y con gusto te ayudaremos.', [
+        {
+          text: 'Aceptar',
+        }
+      ], {
+        cancelable: false
+      });
+      this.setState({ loading: false })
+    });
+  }
+
+  Login = () => {
+    const state = this.state;
+    const jsonIn = {
+      "username": state.telefono,
+      "password": state.pass,
+      "dispositivo": "bd55a0b3-dc1a-4b58-bedb-eb3628175561"
+    };
+    Helpers.setApi(AppApi.LogIn, jsonIn).then((response) => {
+      const Data = response.data;
+      UserLogged.updateToken(Data.token).then(() => {
+        this.ClientePerfil();
+      });
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+  }
+
+  AceptaAviso = () => {
+    const state = this.state;
+    if (state.aceptaAvisoyTerminos == false) {
+      Alert.alert('¡Recuerda!', 'Debes aceptar el aviso de privacidad y los términos y condiciones para continuar con tu registro.', [
+        {
+          text: 'Aceptar'
+        }
+      ], {
+        cancelable: false
+      });
+
+      return;
+    }
+
+    //VGCI
+    Helpers.setApi(AppApi.AceptaAviso, state.aceptaAvisoyTerminos ? 1 : 0).then((response) => {
+      this.AceptaTerminos();
+    }).catch(error => {
+      console.log("error ==>", error);
+
+    })
+
+  }
+
+  AceptaTerminos = () => {
+    const state = this.state;
+    Helpers.setApi(AppApi.AceptaTerminos, state.aceptaAvisoyTerminos ? 1 : 0).then((response) => {
+      this.registrarUsuario()
+      console.log(response);
+
+
+    }).catch(error => {
+      console.log("error ==>", error);
+
+    })
+
+  }
+
+  ClientePerfil = () => {
+
+    Helpers.setApi(AppApi.ClientePerfil).then((response) => {
+      const User = response.data;
+      User.token = UserLogged.getToken;
+      UserLogged.setUserLogged(User).then(() => {
+        console.log("UserLogged ==>", UserLogged.getNombre);
+        this.SavePerfil();
+      })
+        .catch(() => {
+          this.setState({ loading: false })
+          Alert.alert("Error de tipo de datos")
+        });
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+  }
+
+  SavePerfil = async () => {
+    await AsyncStorage.setItem('apiToken', UserLogged.token).then(() => {
+      Helpers.SetRootLeftMenu("HomeScreen");
+    });
+  }
+
+  navToHome = () => {
+    this.Login();
+  }
+
+  Estados = () => {
+    const state = this.state;
+    Helpers.setApi(AppApi.Estados).then((response) => {
+      const Data = response.data;
+      const estados = [];
+
+      Data.map((item) => {
+        estados.push({ value: item.codigo, label: item.nombre })
+      });
+
+
+      this.setState({
+        estados
+      }, () => this.Giro());
+
+    }).catch(error => {
+      console.log("error ==>", error);
+      this.setState({ loading: false })
+    })
+  }
+
+  scroll = () => {
+    // this._flat.scrollToEnd();
+    this._flat.scrollToOffset({ animated: true, offset: 4000 })
+  }
+  render() {
+
+    const state = this.state;
+    const { visibleModalGiro, giroNegocio, cuestionarioRgistro } = this.state
+    return (
+
+      state.loading == true ?
+        <Loading></Loading>
+        :
+
+        <BarNavigationLogOut title={"REGISTRO"} >
+          <KeyboardAwareScrollView
+            contentContainerStyle={{ flex: 1, backgroundColor: Colors.grisClaro }} // Colors.grisClaro
+            enableOnAndroid={true}
+          >
+            <View style={{ flex: 1 }}>
+              <View style={{ flex: 1 }}>
+                <View style={{ alignItems: 'center', padding: 10 }}>
+                  <Text style={{ color: Colors.azulClaro, fontSize: 18, fontWeight: '600' }}>{"Responde estas sencillas preguntas:"}</Text>
+                </View>
+                <FlatList
+                  data={state.cuestionarioRgistro}  //preguntas1
+                  legacyImplementation={true}
+                  ref={(ref) => { this._flat = ref }}
+                  onContentSizeChange={() => {
+                    this.scroll();
+
+                  }}
+                  refreshing={true}
+                  renderItem={({ item, index }) => (
+
+
+                    <View style={{ flexDirection: 'column', }}>
+
+                      {item.respuesta != undefined ?
+                        <View>
+                          <View style={{ paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end' }}>
+                            <Text style={{ color: Colors.azulOscuro, fontSize: 16, fontWeight: '500', paddingHorizontal: 5 }}>{`Usuario ${moment().format("hh:mm A")} `}</Text>
+                            <Image
+                              source={LocalImages.RSIconUsuario}
+                              style={{ resizeMode: 'stretch', width: 40, height: 40, }}
+                            />
+                          </View>
+
+
+                          <View style={{
+                            borderRadius: 5,
+                            backgroundColor: Colors.white,
+                            shadowColor: "#000",
+                            shadowOffset: {
+                              width: 0,
+                              height: 3,
+                            },
+                            shadowOpacity: 0.29,
+                            shadowRadius: 4.65,
+
+                            elevation: 7,
+                            // width: '80%',
+                            padding: 20,
+                            margin: 10,
+                            alignSelf: 'flex-end'
+                          }}>
+                            <Text style={{ color: Colors.azulMarino, fontWeight: '500', textAlign: 'right' }}>{item.respuesta}</Text>
+                          </View>
+                        </View> : null
+                      }
+                      {item.pregunta == null ? null :
+                        <View>
+                          <View style={{ paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center' }}>
+                            <Image
+                              source={LocalImages.RSIconPreguntas}
+                              style={{ resizeMode: 'stretch', width: 40, height: 40, }}
+                            />
+                            <Text style={{ color: Colors.azulOscuro, fontSize: 16, fontWeight: '500', paddingHorizontal: 5 }}>{`Vini ${moment().format("hh:mm A")} `}</Text>
+                          </View>
+
+
+                          <View style={{
+                            borderRadius: 5,
+                            backgroundColor: Colors.white,
+                            shadowColor: "#000",
+                            shadowOffset: {
+                              width: 0,
+                              height: 3,
+                            },
+                            shadowOpacity: 0.29,
+                            shadowRadius: 4.65,
+
+                            elevation: 7,
+                            // width: '80%',
+                            padding: 20,
+                            alignSelf: 'flex-start',
+                            margin: 10,
+                          }}>
+                            {
+                              item.tipoPregunta == "Validacion" ?
+                                <>
+                                  <Text style={{ color: Colors.azulMarino, fontWeight: '500', }}>{item.tituloPregunta}</Text>
+                                  <Text style={{ color: Colors.azulClaro, fontWeight: '500', paddingBottom: 10, fontSize: 16 }}>{item.pregunta}</Text>
+                                  <View style={{ flexDirection: 'row' }}>
+                                    <View style={{ paddingVertical: 10, paddingHorizontal: 5 }}>
+                                      <BotonAzulClaro
+                                        title={"Sí"}
+                                        backgroundColor={'transparent'}
+                                        borderColor={Colors.azulCielo}
+                                        fontWeight={'800'}
+                                        height={50}
+                                        width={140}
+                                        fontSize={12}
+                                        color={Colors.azulCielo}
+                                        onPress={() => { this.setState({ confirmacionCliente: true }, () => this.cargaCuestionarioPregunta(item.pregunta, item.tipoPregunta)) }}
+                                      />
+                                    </View>
+                                    <View style={{ paddingVertical: 10, paddingHorizontal: 5 }}>
+                                      <BotonAzulClaro
+                                        title={"No"}
+                                        backgroundColor={'transparent'}
+                                        borderColor={Colors.azulCielo}
+                                        fontWeight={'800'}
+                                        height={50}
+                                        width={140}
+                                        fontSize={12}
+                                        color={Colors.azulCielo}
+                                        onPress={() => { this.refreshCuestionaro() }}
+                                      />
+                                    </View>
+                                  </View>
+                                </>
+
+                                :
+                                item.tipoPregunta == "OpcionMultiple" ?
+                                  <>
+                                    <Text style={{ color: Colors.azulMarino, fontWeight: '500', paddingBottom: 10 }}>{item.pregunta}</Text>
+                                    {
+                                      state.giros.map((item, index) => (
+                                        <View style={{ paddingVertical: 10 }}>
+                                          <BotonAzulClaro
+                                            title={item.label}
+                                            backgroundColor={'transparent'}
+                                            borderColor={Colors.azulCielo}
+                                            fontWeight={'800'}
+                                            height={50}
+                                            width={200}
+                                            fontSize={12}
+                                            disabled={this.state.inactivaBoton}
+                                            color={Colors.azulCielo}
+                                            onPress={() => {
+                                              this.setState({
+                                                giro: item.value,
+                                                inactivaBoton: cuestionarioRgistro.length > 0 ? false : true,
+                                                selectedGiro: item.label,
+                                                visibleModalGiro: item.label === 'Otro' ? true : false
+                                              }, () => this.seleccionaGiro())
+                                            }}
+                                          />
+                                        </View>
+                                      ))
+                                    }
+                                  </>
+                                  :
+                                  item.tipoPregunta == "OpcionFecha" ?
+                                    <>
+                                      <Text style={{ color: Colors.azulMarino, fontWeight: '500' }}>{item.pregunta}</Text>
+                                      <View style={{ paddingVertical: 10 }}>
+                                        <PickerAzulClaro
+                                          title={"dd/mm/yyyy"}
+                                          backgroundColor={'transparent'}
+                                          maximumDate={this.state.maxfechaNac}
+                                          minimumDate={this.state.minfechaNac}
+                                          borderColor={Colors.azulClaro}
+                                          fontWeight={'800'}
+                                          height={50}
+                                          width={200}
+                                          fontSize={12}
+                                          isVisible={this.state.visibleDate}
+                                          color={Colors.azulClaro}
+                                          onPress={() => this.setState({ visibleDate: true })}
+                                          onCancel={() => this.setState({ visibleDate: false })}
+                                          onConfirm={(value) => { this.setState({ fechaNacimeinto: value, visibleDate: false }, () => this.seleccionaFecha()) }}
+                                        />
+                                      </View>
+                                    </>
+                                    :
+                                    item.tipoPregunta == "PickerEstados" ?
+                                      <>
+                                        <Text style={{ color: Colors.azulMarino, fontWeight: '500' }}>{item.pregunta}</Text>
+                                        <View style={{ paddingVertical: 10, width: 250 }}>
+                                          <PickerAzulRegistro
+                                            value={this.state.estadoId}
+                                            disabled={this.state.disablePicker}
+                                            placeholder={{
+                                              label: "Categorías",
+                                              value: -1,
+                                              color: Colors.negro,
+                                            }}
+                                            items={this.state.estados}
+                                            onValueChange={(value) => {
+                                              if (value != this.state.PickerValueHolder) {
+                                                this.setState({ estadoId: value, PickerValueHolder: value, disablePicker: cuestionarioRgistro.length > 0 ? false : true }, () => { Platform.OS == "android" && this.seleccionaEstado(value) })
+                                              }
+                                            }}
+                                            onDonePress={() => {
+                                              this.setState({ disablePicker: true }, () => { this.seleccionaEstado(this.state.estadoId) })
+                                            }}
+                                          />
+                                        </View>
+                                      </> :
+                                      <Text style={{ color: Colors.azulMarino, fontWeight: '500' }}>{item.pregunta}</Text>
+                            }
+
+
+                          </View>
+                        </View>
+                      }
+                      {
+                        item.tipoPregunta == "CierreCuestionario" &&
+                        <>
+                          {/* <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 20, alignItems: 'center' }}>
+                            <CheckBox
+                              tintColors={'green'}
+                              onCheckColor={'red'}
+                              onFillColor={'yellow'}
+                              onTintColor={'#80F4E8'}
+                              value={this.state.aceptaAvisoyTerminos}
+                              onValueChange={(value) => {
+                                this.setState({
+                                  aceptaAvisoyTerminos: value,
+                                })
+                              }}
+                            />
+                            <Text style={{ color: Colors.grey }}>
+                              {'Acepto los '}
+                              <Text onPress={() => { Helpers.pushToScreen("TerminosLogOutScreen") }} style={{ color: Colors.azulClaro, textDecorationLine: 'underline', fontWeight: '500' }}>{'Términos y Condiciones'}</Text>
+                              <Text style={{ color: Colors.grey }}>{'\ny '}</Text>
+                              <Text onPress={() => { Helpers.pushToScreen("AvisoLogOutScreen") }} style={{ color: Colors.azulClaro, textDecorationLine: 'underline', fontWeight: '500' }}>{'Aviso de Privacidad'}</Text>
+                            </Text>
+
+                          </View> */}
+                          <View style={{ paddingVertical: 10 }}>
+                            <BotonAzulClaro
+                              title={"Iniciar Nuevamente"}
+                              backgroundColor={'transparent'}
+                              borderColor={Colors.azulCielo}
+                              fontWeight={'800'}
+                              height={50}
+                              width={250}
+                              fontSize={14}
+                              color={Colors.azulCielo}
+                              onPress={() => { this.refreshCuestionaro() }}
+                            />
+                          </View>
+                          <View style={{ paddingVertical: 10 }}>
+                            <LinearGradientBottom
+                              title={"Registrar"}
+                              backgroundColor={'transparent'}
+                              borderColor={Colors.azulCielo}
+                              fontWeight={'800'}
+                              height={50}
+                              width={250}
+                              fontSize={14}
+                              color={Colors.white}
+                              onPress={() => { this.registrarUsuario() }} //  this.AceptaAviso()
+
+                            />
+
+
+                          </View>
+                        </>
+
+                      }
+                    </View>
+
+                  )}
+                  keyExtractor={item => item.id}
+                />
+
+
+              </View >
+              <View style={{ flexDirection: 'row', bottom: 0, justifyContent: 'center' }}>
+                <View style={{ flex: 8, paddingHorizontal: 20, marginVertical: 10 }}>
+                  <TextInput
+                    autoCapitalize='none'
+                    secureTextEntry={false}
+                    placeholder={'Mensaje'}
+                    value={state.respuesta}
+                    placeholderTextColor={Colors.blue}
+                    style={{
+                      fontSize: 16, fontWeight: '400', paddingHorizontal: 30, color: Colors.blue, height: 60, borderRadius: 50, backgroundColor: Colors.white, shadowColor: "#000",
+                      shadowOffset: {
+                        width: 0,
+                        height: 3,
+                      },
+                      shadowOpacity: 0.29,
+                      shadowRadius: 4.65,
+
+                      elevation: 7,
+                    }}
+                    onChangeText={(value) => { this.setState({ respuesta: value }) }}
+                  />
+                </View>
+
+                <View style={{ flex: 2, alignItems: 'flex-start', justifyContent: 'center', }}>
+                  <TouchableOpacity onPress={() => { this.cargaCuestionarioPregunta(state.respuesta) }}>
+                    <View style={{
+                      width: 60,
+                      height: 60,
+                      backgroundColor: Colors.white,
+                      borderRadius: 50,
+                      shadowColor: "#000",
+                      shadowOffset: {
+                        width: 0,
+                        height: 3,
+                      },
+                      shadowOpacity: 0.29,
+                      shadowRadius: 4.65,
+
+                      elevation: 7,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+
+                    }}>
+                      <Text style={{ color: Colors.azulMarino, fontWeight: '900', fontSize: 22 }}>{'>'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+              </View>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={false}
+
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={{ alignItems: 'center', width: 330, height: 420 }}>
+                    <TouchableOpacity onPress={() => this.setState({ visibleModal: false })} style={{ width: 70, height: 70, position: 'absolute', zIndex: 2, top: -25, right: -25 }}>
+                      <Image
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMethod='resize'
+                        resizeMode='contain'
+                        source={LocalImages.LSIconClose}
+                      />
+                    </TouchableOpacity>
+                    <CardBody>
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <Text style={{ color: Colors.azulClaro, fontSize: 20, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center' }}>{`Recuperación de Contraseña`}</Text>
+                        <Text style={{ color: Colors.blue, fontSize: 14, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', paddingVertical: 10 }}>{`Ingresa tu número de celular para recuperar tu contraseña.`}</Text>
+                        <View style={{ width: '100%', height: 100 }}>
+                          <View style={{ flex: 1, }}>
+                            <LineTextbox styles={{ borderColor: Colors.blue, color: Colors.azulCielo }} maxl={10} keyboardType={'number-pad'} label={"Teléfono celular"} fontSize={14} labelColor={Colors.blue} value={state.numeroCelular} onChangeText={(value) => this.setState({ numeroCelular: value })} enable={true}></LineTextbox>
+                          </View>
+                        </View>
+                        <Text style={{ color: Colors.grisMedioTono, fontSize: 12, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', padding: 20 }}>{`Se enviará un mensaje de texto al\nnúmero de teléfono celular que\nregistraste.`}</Text>
+                        <BotonAzulClaro title={'CONTINUAR'} onPress={() => { this.ValidateForm() }} ></BotonAzulClaro>
+                      </View>
+
+                    </CardBody>
+                  </View>
+                </View>
+              </Modal >
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={state.visibleModal} //visibleModal
+
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={{ alignItems: 'center', width: 330, height: 420 }}>
+                    <TouchableOpacity onPress={() => this.setState({ visibleModal: false })} style={{ width: 70, height: 70, position: 'absolute', zIndex: 2, top: -25, right: -25 }}>
+                      <Image
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMethod='resize'
+                        resizeMode='contain'
+                        source={LocalImages.LSIconClose}
+                      />
+                    </TouchableOpacity>
+                    <CardBody>
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <Text style={{ color: Colors.azulClaro, fontSize: 20, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center' }}>{`Verificación de dos pasos`}</Text>
+                        <Text style={{ color: Colors.blue, fontSize: 14, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', paddingVertical: 10 }}>{`Se enviará un mensaje de texto a tu teléfono celular •••••${state.telefono.slice(-4)}. Sigue las instrucciones del mensaje para recuperar tu contraseña.`}</Text>
+                        <Image
+                          style={{ width: 120, height: 120 }}
+                          resizeMethod='resize'
+                          resizeMode='contain'
+                          source={LocalImages.RSPalomaModal}
+                        />
+
+                      </View>
+                      <View style={{ paddingVertical: 20 }}>
+                        <BotonAzulClaro title={'CONTINUAR'} onPress={() => { this.setState({ visibleModal: false, modalCodigoVerificacion: true }) }} ></BotonAzulClaro>
+                      </View>
+
+                    </CardBody>
+                  </View>
+                </View>
+              </Modal >
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={state.modalCodigoVerificacion} //modalCodigoVerificacion
+
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={{ alignItems: 'center', width: 330, height: 420 }}>
+                    <TouchableOpacity onPress={() => this.setState({ modalCodigoVerificacion: false })} style={{ width: 70, height: 70, position: 'absolute', zIndex: 2, top: -25, right: -25 }}>
+                      <Image
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMethod='resize'
+                        resizeMode='contain'
+                        source={LocalImages.LSIconClose}
+                      />
+                    </TouchableOpacity>
+                    <CardBody>
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <Text style={{ color: Colors.azulClaro, fontSize: 20, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center' }}>{`Código de Verificación`}</Text>
+                        <Text style={{ color: Colors.blue, fontSize: 14, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', paddingVertical: 10 }}>{`Ingresa el código SMS de recuperación que te hemos enviado.`}</Text>
+                        <CodeInput
+                          codeLength={6}
+                          ref="codeInput"
+                          activeColor={Colors.azulClaro}
+                          inactiveColor={Colors.grisBordePicker}
+                          autoFocus={false}
+                          inputPosition='center'
+                          size={40}
+                          keyboardType="numeric"
+                          onFulfill={(code) => this.setState({ codigo: code })}
+                          containerStyle={{ marginTop: 20, alignItems: 'center' }}
+                          codeInputStyle={{ borderWidth: 1, fontFamily: 'Gotham-Book', height: 50 }}
+                        />
+
+                      </View>
+                      <TouchableOpacity style={{ paddingVertical: 20 }} onPress={() => this.ReenviarCodigo()}>
+                        <Text style={{ color: Colors.blue, fontSize: 14, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', paddingVertical: 10, textDecorationLine: 'underline' }}>{`Reenviar código`}</Text>
+                      </TouchableOpacity>
+                      <View style={{ paddingVertical: 20 }}>
+                        <BotonAzulClaro title={'CONTINUAR'} onPress={() => { this.setState({ visibleModal: false, }, () => this.validaCodigoVerificacion()) }} ></BotonAzulClaro>
+                      </View>
+
+                    </CardBody>
+                  </View>
+                </View>
+              </Modal>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={state.modalNuevoPass}
+
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={{ alignItems: 'center', width: 330, height: 420 }}>
+                    <TouchableOpacity onPress={() => this.setState({ modalNuevoPass: false })} style={{ width: 70, height: 70, position: 'absolute', zIndex: 2, top: -25, right: -25 }}>
+                      <Image
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMethod='resize'
+                        resizeMode='contain'
+                        source={LocalImages.LSIconClose}
+                      />
+                    </TouchableOpacity>
+                    <CardBody>
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <Text style={{ color: Colors.azulClaro, fontSize: 20, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center' }}>{`Crear una nueva contraseña.`}</Text>
+                        <View style={{ width: '100%', height: 100 }}>
+                          <View style={{ flex: 1, }}>
+                            <LineTextbox secure={true} styles={{ borderColor: Colors.blue, color: Colors.azulCielo }} maxl={10} label={"Nueva contraseña"} fontSize={14} labelColor={Colors.blue} value={state.pass} onChangeText={(value) => this.setState({ pass: value })} enable={true}></LineTextbox>
+                          </View>
+                        </View>
+                        <View style={{ width: '100%', height: 100, }}>
+                          <View style={{ flex: 1, }}>
+                            <LineTextbox secure={true} styles={{ borderColor: Colors.blue, color: Colors.azulCielo }} maxl={10} label={"Confirmar nueva contraseña"} fontSize={14} labelColor={Colors.blue} value={state.confirmPass} onChangeText={(value) => this.setState({ confirmPass: value })} enable={true}></LineTextbox>
+                          </View>
+                        </View>
+                      </View>
+                      <Text style={{ color: Colors.blue, fontSize: 14, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', paddingVertical: 10 }}>{`Introduce una contraseña de al menos 8 caracteres, distinguiendo entre mayúsculas, minúsculas, números y símbolos`}</Text>
+                      <View style={{ paddingVertical: 20 }}>
+                        <BotonAzulClaro title={'CONTINUAR'} onPress={() => { this.setState({ visibleModal: false, modalCodigoVerificacion: false }, () => { this.validaPassword() }) }} ></BotonAzulClaro>
+                      </View>
+
+                    </CardBody>
+                  </View>
+                </View>
+              </Modal>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={state.confirmaInicioSesion} //modalCodigoVerificacion
+
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={{ alignItems: 'center', width: 330, height: 420 }}>
+                    <TouchableOpacity onPress={() => this.setState({ confirmaInicioSesion: false })} style={{ width: 70, height: 70, position: 'absolute', zIndex: 2, top: -25, right: -25 }}>
+                      <Image
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMethod='resize'
+                        resizeMode='contain'
+                        source={LocalImages.LSIconClose}
+                      />
+                    </TouchableOpacity>
+                    <CardBody>
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <Text style={{ color: Colors.azulClaro, fontSize: 20, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center' }}>{`Felicidades`}</Text>
+                        <Text style={{ color: Colors.blue, fontSize: 14, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center', paddingVertical: 10 }}>{`Te has registrado correctamente.`}</Text>
+                        <Image
+                          style={{ width: 120, height: 120 }}
+                          resizeMethod='resize'
+                          resizeMode='contain'
+                          source={LocalImages.RSPalomaModal}
+                        />
+
+                      </View>
+                      <View style={{ paddingVertical: 20 }}>
+                        <BotonAzulClaro title={'CONTINUAR'} onPress={() => { this.setState({ visibleModal: false, confirmaInicioSesion: false }, () => { this.navToHome() }) }} ></BotonAzulClaro>
+                      </View>
+
+
+                    </CardBody>
+                  </View>
+                </View>
+              </Modal>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={visibleModalGiro}
+              >
+                <View style={styles.modalOverlayCenter}>
+                  <View style={{ alignItems: 'center', width: 330, height: 420 }}>
+                    <CardBody>
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                        <Text style={{ color: Colors.azulClaro, fontSize: 20, fontWeight: '500', paddingHorizontal: 5, textAlign: 'center' }}>{`Ingresa el giro de tu negocio`}</Text>
+                        <View style={{ width: '100%', height: 100 }}>
+                          <View style={{ flex: 1, }}>
+                            <LineTextbox styles={{ borderColor: Colors.blue, color: Colors.azulCielo, marginBottom: 15 }} fontSize={14} labelColor={Colors.blue} value={state.giroNegocio} onChangeText={(value) => this.setState({ giroNegocio: value })} enable={true}></LineTextbox>
+                          </View>
+                        </View>
+                        <BotonAzulClaro title={'CONTINUAR'} onPress={() => {
+                          if (this.state.giroNegocio) {
+                            this.setState({ visibleModalGiro: false })
+                            this.GiroOtro();
+                          } else {
+                            Alert.alert('Ingresa el giro de tu negocio.', 'Por favor ingresa el giro al que pertenece tu negocio.', [
+                              {
+                                text: 'Aceptar'
+                              }
+                            ], {
+                              cancelable: false
+                            });
+                          }
+                        }} ></BotonAzulClaro>
+                      </View>
+                    </CardBody>
+                  </View>
+                </View>
+              </Modal>
+            </View>
+          </KeyboardAwareScrollView>
+        </BarNavigationLogOut >
+
+
+
+
+    )
+  }
+
+  seleccionaFecha = () => {
+    const { cuestionarioRgistro, contadorPregunta, fechaNacimeinto, respuestas, preguntas } = this.state;
+    // const resp = respuestas;
+
+
+    cuestionarioRgistro.push({
+      id: preguntas[contadorPregunta].id,
+      pregunta: preguntas[contadorPregunta].pregunta,
+      tipoPregunta: preguntas[contadorPregunta].tipoPregunta,
+      respuesta: moment(fechaNacimeinto).format("DD/MM/YYYY")
+    });
+
+    // resp.push({ id: preguntas[contadorPregunta].id, respuestas: fechaNacimeinto });
+    // console.log("resp ==>", resp);
+    let objetoRespuesta = `{"${preguntas[contadorPregunta - 1].nombreCampo}": "${moment(fechaNacimeinto).format("YYYY-MM-DD")}"}`;
+    const obj = JSON.parse(objetoRespuesta);
+    const resp = { ...respuestas, ...obj };
+
+
+    this.setState({ cuestionarioRgistro, loading: false, contadorPregunta: contadorPregunta + 1, respuesta: "", respuestas: resp })
+
+  }
+
+  refreshCuestionaro = () => {
+
+    this.setState({
+      cuestionarioRgistro: [],
+      respuestas: []
+
+    }, () => this.cargaCuestionarioInicial()
+    )
+
+  }
+
+
+  cargaCuestionarioInicial = () => {
+    const { cuestionarioRgistro, contadorPregunta, preguntas } = this.state;
+
+
+    cuestionarioRgistro.push({
+      id: 1,
+      pregunta: preguntas[0].pregunta,
+      tipoPregunta: preguntas[0].tipoPregunta,
+      respuesta: undefined
+    })
+
+    this.setState({ contadorPregunta: 1, cuestionarioRgistro, loading: false, })
+  }
+
+  seleccionaGiro = () => {
+    const { cuestionarioRgistro, contadorPregunta, giro, respuestas, giros, preguntas } = this.state;
+    // const resp = respuestas;
+
+    const labelGiro = giros.filter(f => f.value == giro);
+    // this._flat.scrollToOffset({ animated: true, offset: 2000 })
+    cuestionarioRgistro.push({
+      id: preguntas[contadorPregunta].id,
+      pregunta: preguntas[contadorPregunta].pregunta,
+      tipoPregunta: preguntas[contadorPregunta].tipoPregunta,
+      respuesta: labelGiro.label
+    });
+
+    // resp.push({ id: preguntas[contadorPregunta].id, respuestas: giro });
+    // console.log("resp ==>", resp);
+    let objetoRespuesta = `{"${preguntas[contadorPregunta - 1].nombreCampo}": "${giro}"}`;
+    const obj = JSON.parse(objetoRespuesta);
+    const resp = { ...respuestas, ...obj };
+
+    this.setState({ cuestionarioRgistro, loading: false, contadorPregunta: contadorPregunta + 1, respuesta: "", respuestas: resp })
+  }
+
+  seleccionaEstado = (value) => {
+
+    const { cuestionarioRgistro, contadorPregunta, respuestas, estados, preguntas } = this.state;
+    const filterEstado = estados.filter(f => f.value == value);
+    // const resp = respuestas;
+
+    cuestionarioRgistro.push({
+      id: preguntas[contadorPregunta].id,
+      pregunta: preguntas[contadorPregunta].pregunta,
+      tipoPregunta: preguntas[contadorPregunta].tipoPregunta,
+      respuesta: filterEstado[0].label
+    });
+
+    // resp.push({ id: preguntas[contadorPregunta].id, respuestas: filterEstado[0].label })
+
+    let objetoRespuesta = `{"${preguntas[contadorPregunta - 1].nombreCampo}": "${filterEstado[0].label}"}`;
+    const obj = JSON.parse(objetoRespuesta);
+    const resp = { ...respuestas, ...obj };
+
+    console.log("resp ==>", resp);
+
+    this.setState({ cuestionarioRgistro, loading: false, contadorPregunta: contadorPregunta + 1, respuesta: "", respuestas: resp })
+
+
+  }
+
+
+  cargaCuestionarioPregunta = (value) => {
+    const { cuestionarioRgistro, confirmacionCliente, contadorPregunta, giro, fechaNacimeinto, respuestas, estadoId, preguntas } = this.state;
+    const tipoPreg = preguntas[contadorPregunta - 1].tipoPregunta;
+    // const tipoPreg =  tipoPregunta == undefined ? preguntas[contadorPregunta -1].tipoPregunta : tipoPregunta;
+
+    if (value == "") {
+      Alert.alert('¡Recuerda!', '¡No puedes enviar información vacia', [
+        {
+          text: 'Aceptar',
+
+        }
+      ], {
+        cancelable: false
+      });
+
+      return;
+    }
+
+    if (tipoPreg == "PickerEstados" && estadoId == -1) {
+      Alert.alert('¡Recuerda!', '¡Debes seleccionar un estado para continuar', [
+        {
+          text: 'Aceptar',
+
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+
+    }
+    if (tipoPreg == "BuscadorCliente") {
+
+      this.BuscarCliente(value);
+      return;
+
+    }
+    if (tipoPreg == "Validacion" && confirmacionCliente !== true) {
+      Alert.alert('¡Recuerda!', '¡Debes confirmar tu cuenta', [
+        {
+          text: 'Aceptar',
+
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+
+    }
+    if (tipoPreg == "OpcionMultiple" && giro == undefined) {
+      Alert.alert('¡Recuerda!', '¡Debes seleccionar un giro para avanzar', [
+        {
+          text: 'Aceptar',
+
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+
+    }
+
+    if (tipoPreg == "OpcionFecha" && fechaNacimeinto == undefined) {
+      Alert.alert('¡Recuerda!', '¡Debes seleccionar tu fecha de nacimiento para avanzar', [
+        {
+          text: 'Aceptar',
+
+        }
+      ], {
+        cancelable: false
+      });
+      return;
+
+    }
+    this._flat.scrollToOffset({ animated: true, offset: 4000 })
+    cuestionarioRgistro.push({
+      id: preguntas[contadorPregunta].id,
+      pregunta: preguntas[contadorPregunta].pregunta,
+      tipoPregunta: preguntas[contadorPregunta].tipoPregunta,
+      respuesta: value
+    });
+
+    console.log("cuestionarioRgistro ==>", cuestionarioRgistro)
+
+    let objetoRespuesta = `{"${preguntas[contadorPregunta - 1].nombreCampo}": "${value}"}`;
+    // resp.push({ id: preguntas[contadorPregunta].id, respuestas: value })
+    const obj = JSON.parse(objetoRespuesta);
+    const resp = { ...respuestas, ...obj };
+
+    this.setState({ cuestionarioRgistro, loading: false, contadorPregunta: contadorPregunta + 1, respuesta: "", respuestas: resp })
+  }
+
+  componentDidMount = () => {
+
+    this.TextosRegistro();
+    // this.cargaCuestionarioInicial();s
+
+  }
+
+
+}
+
+
+
+
+const styles = StyleSheet.create({
+  modalOverlayCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)'
+  },
+});
